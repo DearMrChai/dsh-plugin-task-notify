@@ -1,0 +1,11 @@
+# dsh bundle patch: inserts task-notify into a profile's layer stack.
+# inject: [settings] is required — the host half registers a settings
+# namespace synchronously in apply(), and the loader needs to wait for
+# the settings service before calling apply.
+- insert:
+    - id: task-notify
+      name: dsh-plugin-task-notify
+      inject: [settings]
+      config:
+        enabled: true
+        thresholdMinutes: 5
