@@ -196,7 +196,8 @@ class SessionTracker {
           this.engine.master(cfg.masterVolume)
           if (cfg.titleFlash) flashTitle()
           if (cfg.ttsEnabled) {
-            this.engine.speak(`任务完成，用时约 ${this.minutes(durationMs)} 分钟`)
+            const ttsText = (cfg.ttsTemplate ?? '任务完成，用时约 {time} 分钟').replace(/\{time\}/g, this.minutes(durationMs))
+            this.engine.speak(ttsText)
           }
         }
       }

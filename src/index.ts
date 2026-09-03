@@ -27,6 +27,7 @@ export const Config: z<TaskNotifyConfig> = z.object({
   masterVolume: z.number().step(0.1).min(0).max(1).default(0.6),
   subVolume: z.number().step(0.1).min(0).max(1).default(0.5),
   ttsEnabled: z.boolean().default(false),
+  ttsTemplate: z.string().default('任务完成，用时约 {time} 分钟'),
   titleFlash: z.boolean().default(true),
   globalSessions: z.boolean().default(true),
   batchSingleBeep: z.boolean().default(false),

@@ -23,6 +23,8 @@ export interface TaskNotifyConfig {
   subVolume: number
   /** TTS 播报开关（默认关）：开的话整轮完成时读一句“任务完成，用时 X 分钟”。 */
   ttsEnabled: boolean
+  /** TTS 播报模板：{time} 会被替换为实际用时（如 "3.5 分钟"）。 */
+  ttsTemplate: string
   /** 标题栏闪动开关：整轮完成时页面标题闪“● 任务完成”。 */
   titleFlash: boolean
   /** 多会话全局提醒：任何会话的整轮完成都响（默认开）；关掉只监听当前会话。 */
@@ -40,6 +42,7 @@ export const DEFAULT_TASK_NOTIFY_CONFIG: TaskNotifyConfig = {
   masterVolume: 0.6,
   subVolume: 0.5,
   ttsEnabled: false,
+  ttsTemplate: '任务完成，用时约 {time} 分钟',
   titleFlash: true,
   globalSessions: true,
   batchSingleBeep: false,

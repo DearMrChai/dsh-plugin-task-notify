@@ -185,11 +185,13 @@ export function TaskNotifyCard({ value, set }: TaskNotifyCardInjected) {
     masterVolume: String(base.masterVolume),
     subVolume: String(base.subVolume),
   }))
+  const [ttsTemplateText, setTtsTemplateText] = useState(base.ttsTemplate ?? '任务完成，用时约 {time} 分钟')
 
   const boolDirty = bools !== null && BOOL_KEYS.some((k) => (bools as TaskNotifyConfig)[k] !== base[k])
   const numDirty = NUM_KEYS.some((k) => numText[k] !== String(base[k]))
+  const ttsDirty = ttsTemplateText !== (base.ttsTemplate ?? '任务完成，用时约 {time} 分钟')
   const invalid = NUM_KEYS.some((k) => numText[k] !== '' && !Number.isFinite(Number(numText[k])))
-  const dirty = boolDirty || numDirty
+  const dirty = boolDirty || numDirty || ttsDirty
 
   const toggleBool = (key: BoolKey, next: boolean): void => {
     setBools((b) => ({ ...(b ?? base), [key]: next }))
@@ -212,17 +214,19 @@ export function TaskNotifyCard({ value, set }: TaskNotifyCardInjected) {
         if (b !== base[k]) set(k, b)
       }
     }
+    if (ttsDirty) set('ttsTemplate', ttsTemplateText)
     setBools(null)
   }
   const onDiscard = (): void => {
     setBools(null)
     setNumText({ thresholdMinutes: String(base.thresholdMinutes), mergeMs: String(base.mergeMs), masterVolume: String(base.masterVolume), subVolume: String(base.subVolume) })
+    setTtsTemplateText(base.ttsTemplate ?? '任务完成，用时约 {time} 分钟')
   }
 
   const name = '任务提醒'
   const description = '长轮完成“叮”、子任务完成“嘟”：阈值、音量与提醒形式可按需配置'
 
-  const cur = { ...base, ...(bools ?? {}), thresholdMinutes: parseNum(numText.thresholdMinutes, base.thresholdMinutes), mergeMs: parseNum(numText.mergeMs, base.mergeMs), masterVolume: parseNum(numText.masterVolume, base.masterVolume), subVolume: parseNum(numText.subVolume, base.subVolume) } as TaskNotifyConfig
+  const cur = { ...base, ...(bools ?? {}), ttsTemplate: ttsTemplateText, thresholdMinutes: parseNum(numText.thresholdMinutes, base.thresholdMinutes), mergeMs: parseNum(numText.mergeMs, base.mergeMs), masterVolume: parseNum(numText.masterVolume, base.masterVolume), subVolume: parseNum(numText.subVolume, base.subVolume) } as TaskNotifyConfig
 
   return (
     <li style={open ? { ...s.card, ...s.cardOpen } : s.card}>
@@ -308,7 +312,24 @@ export function TaskNotifyCard({ value, set }: TaskNotifyCardInjected) {
             onEdit={(t) => { editNum('subVolume', t) }}
             onReset={() => { resetNum('subVolume') }}
           />
-          <Switch label="TTS 语音播报" hint="整轮完成时读一句“任务完成”，默认关" checked={cur.ttsEnabled} disabled={false} border onChange={(v) => { toggleBool('ttsEnabled', v) }} />
+          <Switch label="TTS 语音播报" hint="整轮完成时读一句自定义模板，默认关" checked={cur.ttsEnabled} disabled={false} border onChange={(v) => { toggleBool('ttsEnabled', v) }} />
+          {cur.ttsEnabled ? (
+            <Field
+              id="task-notify-ttsTemplate"
+              label="TTS 播报模板"
+              hint="用 {time} 代表实际用时，如“报告队长！用了 {time} 搞定了~”"
+              text={ttsTemplateText}
+              invalid={false}
+              overridden={ttsDirty}
+              overriddenLabel="已修改"
+              resetLabel="重置"
+              invalidLabel=""
+              disabled={false}
+              border
+              onEdit={(t) => { setTtsTemplateText(t) }}
+              onReset={() => { setTtsTemplateText(base.ttsTemplate ?? '任务完成，用时约 {time} 分钟') }}
+            />
+          ) : null}
           <Switch label="标题闪动" hint="整轮完成时页面标题闪“● 任务完成”" checked={cur.titleFlash} disabled={false} border onChange={(v) => { toggleBool('titleFlash', v) }} />
           <Switch label="多会话全局提醒" hint="任意会话长轮结束都响；关掉只监听当前会话" checked={cur.globalSessions} disabled={false} border onChange={(v) => { toggleBool('globalSessions', v) }} />
           <Switch label="整批只响一声" hint="一轮内多个子任务完成只响一声嘟" checked={cur.batchSingleBeep} disabled={false} border onChange={(v) => { toggleBool('batchSingleBeep', v) }} />
