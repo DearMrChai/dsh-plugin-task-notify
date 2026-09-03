@@ -9,7 +9,7 @@ DSH（DeepSeek Harness）长任务完成提醒：**你发出消息不响；子�
 - **Beep on sub-task / 嘟（子任务完成）**: listens for sub-agent tool calls (`subagent`, `subagent_fork`, etc.) settling; plays a short beep per completion, with an automatic merge window for rapid consecutive ones.
 - **Ding on turn end / 叮（整轮完成）**: starts a timer when the turn begins; if the turn runs past a configurable threshold (default 5 min), plays a rising two-tone ding when the agent returns idle — the signal to come back. Short turns stay silent.
 - **Multi-session / 多会话全局**: monitors all sessions by default; configurable to current session only.
-- **Self-contained audio / 声音自包含**: Web Audio API synthesis, no external assets; optional TTS via `speechSynthesis` (off by default).
+- **Self-contained audio / 声音自包含**: Web Audio API synthesis, no external assets; optional TTS via `speechSynthesis` (off by default) with customizable template — use `{time}` as a placeholder for the actual duration.
 - **Two-half structure / 两个半结构**: Host half registers the settings namespace; Client half runs the browser reminder.
 
 ## Install / 安装
@@ -57,6 +57,7 @@ Restart `dsh web` and the settings card appears under **Settings → Plugins**.
 | `masterVolume` | Ding volume, 0..1 | `0.6` |
 | `subVolume` | Beep volume, 0..1 | `0.5` |
 | `ttsEnabled` | TTS readout (default off) | `false` |
+| `ttsTemplate` | TTS template, `{time}` = actual duration | `任务完成，用时约 {time} 分钟` |
 | `titleFlash` | Title-bar flash on turn end | `true` |
 | `globalSessions` | Monitor all sessions | `true` |
 | `batchSingleBeep` | Single beep per turn for all sub-tasks | `false` |
@@ -65,7 +66,7 @@ Restart `dsh web` and the settings card appears under **Settings → Plugins**.
 
 - **You send a message**: silent.
 - **Sub-task completes**: a sub-agent-family tool call disappears from `runningCalls` → short beep. Merge window deduplicates rapid completions; `batchSingleBeep` makes one beep per whole turn.
-- **Turn ends**: session goes from running to idle AND the timer ≥ threshold → rising two-tone ding + optional title flash + optional TTS "任务完成，用时约 X 分钟".
+- **Turn ends**: session goes from running to idle AND the timer ≥ threshold → rising two-tone ding + optional title flash + optional TTS using your custom template (with `{time}` replaced by actual duration).
 
 ## Browser notes / 浏览器注意
 
