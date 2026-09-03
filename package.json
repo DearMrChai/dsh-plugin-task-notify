@@ -1,6 +1,6 @@
 {
   "name": "dsh-plugin-task-notify",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "长任务完成语音提醒插件：子任务完成响\"嘟\"、整轮完成响\"叮\"，阈值/音量/多会话全局可配置（纯前端、零 host 改动）",
   "keywords": [
     "dsh-plugin",
