@@ -28,6 +28,7 @@ Restart `dsh web` and the settings card appears under **Settings → Plugins**.
    ```bash
    pnpm install && pnpm build
    ```
+   > The `lib/` directory ships pre-built; only rebuild after modifying `src/`.
 2. Copy the whole package into the DSH profile:
    ```
    <dsh-home>/profiles/web/node_modules/dsh-plugin-task-notify/
