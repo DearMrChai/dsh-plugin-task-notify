@@ -116,9 +116,31 @@ interface RunningCallLike {
   subCalls?: readonly RunningCallLike[]
 }
 
-function collectSubagentIds(nodes: readonly unknown[]): Set<string> {
+/* ------------------------------------------------------------------ */
+/* Snapshot-shape adapters                                            */
+/* DSH 0.1.2-rc.1: SessionSnapshot 的 runningCalls/turnTimings 位于   */
+/* chat 视图 legacy 子对象（views.get('chat')?.legacy）；rc.8 平铺在   */
+/* 顶层。统一兼容读取，缺失时安全降级为空，杜绝 `items is not iterable` */
+/* ------------------------------------------------------------------ */
+
+function runningCallsOf(snap: ConversationSnapshot): readonly RunningCallLike[] {
+  const s = snap as unknown as { views?: { get?(k: string): { legacy?: { runningCalls?: unknown } } | undefined }; runningCalls?: unknown }
+  const arr = s?.views?.get?.('chat')?.legacy?.runningCalls ?? s?.runningCalls
+  return Array.isArray(arr) ? (arr as RunningCallLike[]) : []
+}
+
+function turnTimingsOf(snap: ConversationSnapshot): ReadonlyMap<number, { startTime: number; endTime?: number }> {
+  const s = snap as unknown as { views?: { get?(k: string): { legacy?: { turnTimings?: unknown } } | undefined }; turnTimings?: unknown }
+  const m = s?.views?.get?.('chat')?.legacy?.turnTimings ?? s?.turnTimings
+  return m !== null && typeof m === 'object' && typeof (m as { values?: unknown }).values === 'function'
+    ? (m as ReadonlyMap<number, { startTime: number; endTime?: number }>)
+    : new Map()
+}
+
+function collectSubagentIds(nodes: readonly unknown[] | undefined): Set<string> {
   const ids = new Set<string>()
-  const walk = (items: readonly unknown[]): void => {
+  const walk = (items: readonly unknown[] | undefined): void => {
+    if (!Array.isArray(items)) return
     for (const item of items) {
       const call = item as RunningCallLike
       if (typeof call?.name === 'string' && SUBAGENT_TOOL_NAMES.includes(call.name) && typeof call.callId === 'string') {
@@ -158,14 +180,14 @@ class SessionTracker {
   private adopt(): void {
     const snap = this.snapshot()
     this.wasRunning = snap.running
-    this.openIds = collectSubagentIds(snap.runningCalls)
+    this.openIds = collectSubagentIds(runningCallsOf(snap))
     if (snap.running) this.runStartAt = this.openTurnStart(snap) ?? Date.now()
     dbg('adopt', this.id, { running: snap.running, openSubagents: this.openIds.size })
   }
 
   /** 当前未结束轮次的起始时间（更准）；无则回退到挂载时刻。 */
   private openTurnStart(snap: ConversationSnapshot): number | null {
-    for (const timing of snap.turnTimings.values()) {
+    for (const timing of turnTimingsOf(snap).values()) {
       if (timing.endTime === undefined) return timing.startTime
     }
     return null
@@ -208,7 +230,7 @@ class SessionTracker {
 
     /* --- 子任务完成：subagent 家族调用从 running 集合消失 → 嘟 --- */
     if (cfg.subReminderEnabled) {
-      const next = collectSubagentIds(snap.runningCalls)
+      const next = collectSubagentIds(runningCallsOf(snap))
       let settled = 0
       for (const id of this.openIds) if (!next.has(id)) settled += 1
       if (settled > 0) {

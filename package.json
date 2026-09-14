@@ -1,6 +1,6 @@
 {
   "name": "dsh-plugin-task-notify",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "长任务完成语音提醒插件：子任务完成响\"嘟\"、整轮完成响\"叮\"，阈值/音量/多会话全局可配置（纯前端、零 host 改动）",
   "keywords": [
     "dsh-plugin",
@@ -57,7 +57,7 @@
     "@deepseek-ai/dsh-client-locale": "0.1.0-rc.8",
     "@deepseek-ai/dsh-client-ui-settings": "0.1.0-rc.8",
     "@deepseek-ai/dsh-settings": "0.1.0-rc.8",
-    "@deepseek-ai/schemastery": "^1.1.0",
+    "@deepseek-ai/schemastery": "^3.18.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },
@@ -77,7 +77,7 @@
     "@deepseek-ai/dsh-client-runtime": "0.1.0-rc.8",
     "@deepseek-ai/dsh-client-ui-settings": "0.1.0-rc.8",
     "@deepseek-ai/dsh-settings": "0.1.0-rc.8",
-    "@deepseek-ai/schemastery": "^1.1.0",
+    "@deepseek-ai/schemastery": "3.18.2",
     "@types/node": "^24.10.0",
     "@types/react": "~18.3.1",
     "@types/react-dom": "~18.3.0",

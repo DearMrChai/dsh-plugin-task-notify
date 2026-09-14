@@ -79,8 +79,14 @@ Restart `dsh web` and the settings card appears under **Settings → Plugins**.
 
 - Targets DSH `0.1.0-rc.8` client contract (same baseline as `dsh-plugin-agent-workflow`).
 - Uses only public session snapshots (`sessions.list`, `running`, `runningCalls`) and standard settings slots.
+- **Settings card staleness fix (0.2.1, 2026-09)**: the card now receives the live bound settings scope and subscribes to it, so saved values render immediately (the slot renderer caches a one-shot `inject()` snapshot forever).
+- **DSH `0.1.2-rc.1` snapshot-shape fix (2026-09)**: the client notifier previously read `snap.runningCalls` / `snap.turnTimings` as flat fields, but on `0.1.2-rc.1` `SessionSnapshot` only exposes `running` (running-call tree / turn timings moved into the chat view `views.get('chat')?.legacy`). Reading the flat field threw `TypeError: items is not iterable` inside `walk` → every `SessionTracker.adopt()` died → `trackers= 0` and the whole notifier was silent, with the error repeating on every sync. Fix: added `runningCallsOf()` / `turnTimingsOf()` adapters that read `views.get('chat')?.legacy?.runningCalls` first, fall back to the flat field, and degrade to empty on absence; `walk` now guards `Array.isArray`. On `0.1.2-rc.1` the turn-end "叮" works (it only needs `running`); the sub-agent "嘟" is a silent no-op there because the running-call tree is not reachable through `sessions` without the chat-view service.
 
 ## Troubleshooting / 排坑
+
+**Card shows stale values right after Save** (controls look like they "did not work" even though the settings file actually updated):
+
+The DSH slot renderer **caches each slot entry's `inject()` result per registration** (`dsh-client-ui-renderer` `cachedRootInject`, a WeakMap keyed by the entry). The settings card therefore receives whatever the `inject` closure returned on first render, forever. The 0.2.0 card was injected a one-shot `value` snapshot, so after Save (which writes via the live `scope.set`) the card fell back to the frozen snapshot and displayed the pre-save state. Fix (0.2.1): the `inject` closure hands the card the **live bound settings scope** instead of a snapshot; the card subscribes to it (`scope.subscribe` + `scope.getSnapshot().value`) and re-reads after every settled write, so Save updates the card without a reload.
 
 **Settings card does not appear** even though the plugin shows as mounted and active in the plugin list:
 

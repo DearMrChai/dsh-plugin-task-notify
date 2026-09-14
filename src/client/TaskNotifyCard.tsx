@@ -11,14 +11,32 @@
  * locally — booleans toggle into a draft, numeric fields keep raw text — and
  * only committed to the bound settings scope on Save; Discard drops the draft.
  */
-import { useState, type CSSProperties } from 'react'
+import { useEffect, useState, type CSSProperties } from 'react'
 import type { TaskNotifyConfig } from '../task-notify-config.ts'
 import { DEFAULT_TASK_NOTIFY_CONFIG } from '../task-notify-config.ts'
 
+/**
+ * Minimal live-scope face the card subscribes to. Structurally compatible
+ * with `SettingsScope<T>` from @deepseek-ai/dsh-client-ui-settings — declared
+ * locally (type-only) so the card never value-imports across the plugin
+ * bundle boundary.
+ */
+interface TaskNotifySettingsScope {
+  /** @returns the current sync snapshot (stable reference until the next change). */
+  getSnapshot(): { value?: TaskNotifyConfig | null }
+  /** Observe snapshot replacements; returns the disposer. */
+  subscribe(listener: () => void): () => void
+}
+
 /** Props the card receives from the register's `inject` closure. */
 export interface TaskNotifyCardInjected {
-  /** Resolved value at registration. */
-  value: TaskNotifyConfig
+  /**
+   * The LIVE bound settings scope. The slot renderer caches an inject()
+   * result per registration, so a one-shot `value` snapshot would freeze at
+   * first render; the card instead subscribes here and re-reads after every
+   * write settles — Save therefore updates the card without a reload.
+   */
+  scope: TaskNotifySettingsScope
   /** Write one field to the namespace's user layer. */
   set: <K extends keyof TaskNotifyConfig>(field: K, value: TaskNotifyConfig[K]) => void
 }
@@ -175,9 +193,15 @@ function parseNum(text: string, fallback: number): number {
   return Number.isFinite(n) ? n : fallback
 }
 
-export function TaskNotifyCard({ value, set }: TaskNotifyCardInjected) {
+export function TaskNotifyCard({ scope, set }: TaskNotifyCardInjected) {
   const [open, setOpen] = useState(false)
-  const base = value ?? DEFAULT_TASK_NOTIFY_CONFIG
+  // Live-resolved config: re-read from the bound scope on every snapshot
+  // change (i.e. after each settled write) instead of trusting a one-shot
+  // registration-time value that the slot renderer caches forever.
+  const [base, setBase] = useState<TaskNotifyConfig>(() => scope.getSnapshot().value ?? DEFAULT_TASK_NOTIFY_CONFIG)
+  useEffect(() => scope.subscribe(() => {
+    setBase(scope.getSnapshot().value ?? DEFAULT_TASK_NOTIFY_CONFIG)
+  }), [scope])
   const [bools, setBools] = useState<TaskNotifyConfig | null>(null)
   const [numText, setNumText] = useState<Record<NumKey, string>>(() => ({
     thresholdMinutes: String(base.thresholdMinutes),

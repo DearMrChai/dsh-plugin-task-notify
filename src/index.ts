@@ -5,7 +5,13 @@
  * services are provided — the whole reminder behavior lives in the browser.
  */
 import type { Context } from '@deepseek-ai/cordis'
-import { settingsNamespace } from '@deepseek-ai/dsh-settings'
+// NOTE: dsh-settings@0.1.2-rc.1 (bundled with DSH 0.1.2-rc.1) removed the
+// runtime `settingsNamespace` export (present in 0.1.0-rc.8). It was a pure
+// type-brand no-op (`return value`), so we use the raw namespace string with a
+// type-only import — compatible with BOTH the rc.8 and 0.1.2-rc.1 contracts.
+// A value import would crash at module-eval time and take down the whole
+// plugin bundle (cordis import failure).
+import type { SettingsNamespace } from '@deepseek-ai/dsh-settings'
 import z from '@deepseek-ai/schemastery'
 import { TASK_NOTIFY_NS, type TaskNotifyConfig } from './task-notify-config.ts'
 
@@ -13,7 +19,7 @@ export type { TaskNotifyConfig } from './task-notify-config.ts'
 export { TASK_NOTIFY_NS } from './task-notify-config.ts'
 
 /** The `task-notify` settings namespace brand (join key with the browser half). */
-export const TASK_NOTIFY_SETTINGS_NS = settingsNamespace(TASK_NOTIFY_NS)
+export const TASK_NOTIFY_SETTINGS_NS: SettingsNamespace = TASK_NOTIFY_NS as SettingsNamespace
 
 /** Cordis dependency declaration: this plugin waits until the settings service is visible. */
 export const inject = ['settings']
