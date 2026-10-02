@@ -34,7 +34,8 @@ export function dbg(...args: unknown[]): void {
 /* Web Audio engine (pure tones; no external assets)                   */
 /* ------------------------------------------------------------------ */
 
-class SoundEngine {
+/** 0.3.0 起导出：桌面端通知器（desktop.ts）复用同一音色引擎。 */
+export class SoundEngine {
   private audio: AudioContext | null = null
 
   /** Browsers gate audio on a user gesture; unlock on the first interaction. */
@@ -91,8 +92,8 @@ class SoundEngine {
   }
 }
 
-/** 标题闪动若干轮后还原。 */
-function flashTitle(times = 3, intervalMs = 700): void {
+/** 标题闪动若干轮后还原。（0.3.0 起导出：桌面端路径复用） */
+export function flashTitle(times = 3, intervalMs = 700): void {
   if (typeof document === 'undefined' || typeof window === 'undefined') return
   const original = document.title
   let tick = 0

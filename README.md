@@ -75,9 +75,44 @@ Restart `dsh web` and the settings card appears under **Settings → Plugins**.
 - TTS may be throttled in background tabs; Web Audio beeps/dings are unaffected.
 - Stops when the page closes; DSH host keeps running but sound needs the browser open.
 
+## Desktop (DSH 0.2.x) / 桌面端
+
+0.3.0 起同一份产物同时兼容 DSH 桌面端（`0.2.0-rc.2` 实证）。桌面端与 web 的差异：
+
+- **配置来源**：桌面端客户端运行时没有 `settingsScope` 服务、设置页也不再渲染
+  `settings.plugin.item` 槽位，因此**没有设置卡**。配置走宿主半新增的
+  `GET /task-notify/api/config` 路由，值来自 profile 的 patch 层 ——
+  改配置 = 手编 `profiles/desktop/cordis.patch.yml`：
+
+  ```yaml
+  - id: task-notify
+    config:
+      enabled: true
+      thresholdMinutes: 5
+      masterVolume: 0.6
+  ```
+
+  （patch 对 config 是整体替换语义，要改的字段写全；改完重启桌面端。）
+- **轮次边界**：不再读 `getSnapshot().running`（0.2.0 会话快照无此字段），改订阅
+  每个会话的 `eventSource` 事件流（`turn/start` / `turn/end`），与
+  `dsh-plugin-whale-pet` 同款客户端契约。声音触发规则与 web 一致。
+- **子任务"嘟"**：以会话行的 `parentSessionId` 识别子代理会话。字段缺失时该
+  特性静默降级（不误报主任务"叮"）。
+- **装载**（与 `dsh-plugin-host-monitor` 桌面端同款）：profile `package.json`
+  的 `link:` 依赖（junction 直连仓库）+ `dsh.profile.bundles` 登记 + 重启。
+  包自带 `cordis.patch.yml`（bundle 层提供 `inject: [settings]` 与默认值）。
+
 ## Compatibility / 兼容性
 
 - Targets DSH `0.1.0-rc.8` client contract (same baseline as `dsh-plugin-agent-workflow`).
+- **DSH desktop `0.2.0-rc.2` dual-path support (0.3.0, 2026-10)**: the desktop
+  client runtime dropped `settingsScope` and the plugins-tab slot, and the host
+  `dsh-settings` dropped `register()`/`watch()`. The host half now capability-probes
+  `ctx.settings.register` (0.1.x namespace loop on web; config comes from the
+  `apply(ctx, config)` argument on desktop), serves `/task-notify/api/config`,
+  and the client half soft-probes `settingsScope` (declared `inject` keeps only
+  services that exist on both runtimes) to pick the web card path or the desktop
+  `eventSource` notifier path.
 - Uses only public session snapshots (`sessions.list`, `running`, `runningCalls`) and standard settings slots.
 - **Settings card staleness fix (0.2.1, 2026-09)**: the card now receives the live bound settings scope and subscribes to it, so saved values render immediately (the slot renderer caches a one-shot `inject()` snapshot forever).
 - **DSH `0.1.2-rc.1` snapshot-shape fix (2026-09)**: the client notifier previously read `snap.runningCalls` / `snap.turnTimings` as flat fields, but on `0.1.2-rc.1` `SessionSnapshot` only exposes `running` (running-call tree / turn timings moved into the chat view `views.get('chat')?.legacy`). Reading the flat field threw `TypeError: items is not iterable` inside `walk` → every `SessionTracker.adopt()` died → `trackers= 0` and the whole notifier was silent, with the error repeating on every sync. Fix: added `runningCallsOf()` / `turnTimingsOf()` adapters that read `views.get('chat')?.legacy?.runningCalls` first, fall back to the flat field, and degrade to empty on absence; `walk` now guards `Array.isArray`. On `0.1.2-rc.1` the turn-end "叮" works (it only needs `running`); the sub-agent "嘟" is a silent no-op there because the running-call tree is not reachable through `sessions` without the chat-view service.
