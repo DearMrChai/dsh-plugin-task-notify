@@ -53,6 +53,8 @@ class DesktopTurnTracker {
   private lastSeq = Number.NEGATIVE_INFINITY
   private lastBeepAt = 0
   private beepedThisTurn = false
+  // adopt 时快照可能还没注水（entries 为空）⇒ lastSeq 立不住基线，整段历史会被当成新事件。
+  private armed = false
 
   constructor(
     private readonly id: string,
@@ -64,35 +66,46 @@ class DesktopTurnTracker {
   /** 初次挂载：扫可见 entries 认领已开轮（只计时，不补响历史轮）。 */
   adopt(entries: unknown[] | undefined): void {
     let openStart: number | null = null
+    let sawSeq = false
     for (const item of entries ?? []) {
       const event = entryEvent(item)
       if (!event) continue
       const seq = event.seq
-      if (typeof seq === 'number' && seq > this.lastSeq) this.lastSeq = seq
+      if (typeof seq === 'number') {
+        sawSeq = true
+        if (seq > this.lastSeq) this.lastSeq = seq
+      }
       if (event.type === 'turn/start') openStart = eventTime(event)
       else if (event.type === 'turn/end') openStart = null
     }
     this.turnStartAt = openStart
-    dbg('desktop adopt', this.id, { openStart, lastSeq: this.lastSeq })
+    // adopt 见过带序号的事件 ⇒ lastSeq 已是"历史末尾"，之后的事件必然是新轮，可以响。
+    if (sawSeq) this.armed = true
+    dbg('desktop adopt', this.id, { openStart, lastSeq: this.lastSeq, armed: this.armed })
   }
 
   /** 事件流通知：只处理 lastSeq 之后的新事件（重扫可见窗口，量小）。 */
   ingest(entries: unknown[] | undefined): void {
+    let sawAny = false
     for (const item of entries ?? []) {
       const event = entryEvent(item)
       if (!event) continue
       const seq = event.seq
       if (typeof seq !== 'number' || seq <= this.lastSeq) continue
       this.lastSeq = seq
+      sawAny = true
+      const live = this.armed
       try {
-        this.handleEvent(event)
+        this.handleEvent(event, live)
       } catch (err) {
         dbg('desktop handleEvent failed', this.id, err)
       }
     }
+    // 第一遍拿到事件只用来把 turnStartAt / lastSeq 对齐到历史末尾，本身一律不补响。
+    if (sawAny) this.armed = true
   }
 
-  private handleEvent(event: Loose): void {
+  private handleEvent(event: Loose, live: boolean): void {
     const cfg = this.config()
     if (cfg.enabled === false) return
     if (event.type === 'turn/start') {
@@ -106,6 +119,10 @@ class DesktopTurnTracker {
     this.turnStartAt = null
     if (start === null) return
     const durationMs = Math.max(0, Date.now() - start)
+    if (!live) {
+      console.info('[task-notify] desktop 回填静音:', this.id, `dur=${Math.round(durationMs / 1000)}s`, '旧轮不补响')
+      return
+    }
     if (this.isSubagent()) {
       if (!cfg.subReminderEnabled) return
       const now = Date.now()
@@ -193,6 +210,7 @@ export function installDesktopNotifier(ctx: Loose): void {
   void refreshConfig()
 
   const trackers = new Map<string, { dispose: () => void }>()
+  const pending = new Set<string>()
 
   /** 子代理判定：会话行 parentSessionId 存在即子代理（字段缺失 → 一律视为主会话）。 */
   const isSubagentRow = (id: string): boolean => {
@@ -204,8 +222,21 @@ export function installDesktopNotifier(ctx: Loose): void {
     }
   }
 
+  /**
+   * 0.2.x 的 sessions.retain() 会**同步** publishRetention，直接回调 list 订阅者（=下面的 sync）。
+   * 所以占位必须早于 retain：否则同一 id 在 retain 返回前被再次 attach，形成同步递归并把渲染进程钉死。
+   */
   const attach = (id: string): void => {
-    if (trackers.has(id)) return
+    if (trackers.has(id) || pending.has(id)) return
+    pending.add(id)
+    try {
+      attachNow(id)
+    } finally {
+      pending.delete(id)
+    }
+  }
+
+  const attachNow = (id: string): void => {
     let ref: Loose | undefined
     try {
       ref = sessions.retain(id, { source: 'task-notify' })
@@ -266,7 +297,27 @@ export function installDesktopNotifier(ctx: Loose): void {
     console.info('[task-notify] desktop attach tracker:', id)
   }
 
+  let syncing = false
+  let dirty = false
+
+  // 递归的第二道闸：sync 里任何一次 attach 引发的同步发布都只标记"待重跑"，不叠栈。
   sync = (): void => {
+    if (syncing) {
+      dirty = true
+      return
+    }
+    syncing = true
+    try {
+      do {
+        dirty = false
+        syncOnce()
+      } while (dirty)
+    } finally {
+      syncing = false
+    }
+  }
+
+  const syncOnce = (): void => {
     let ids: string[] = []
     let current: string | undefined
     try {
