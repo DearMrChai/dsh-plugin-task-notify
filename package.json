@@ -1,7 +1,7 @@
 {
   "name": "dsh-plugin-task-notify",
-  "version": "0.3.0",
-  "description": "长任务完成语音提醒插件：子任务完成响\"嘟\"、整轮完成响\"叮\"，阈值/音量/多会话全局可配置（web 设置卡 + 桌面端 0.2.0 eventSource 双端兼容）",
+  "version": "0.3.1",
+  "description": "长任务完成语音提醒插件：子任务完成响\"嘟\"、整轮完成响\"叮\"，阈值/音量/多会话全局可配置（web 设置卡 + 桌面端 0.2.0 eventSource + 设置页内置插件区任务提醒标签页，双端兼容）",
   "keywords": [
     "dsh-plugin",
     "deepseek-harness",

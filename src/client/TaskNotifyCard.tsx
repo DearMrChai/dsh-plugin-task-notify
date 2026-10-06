@@ -13,7 +13,7 @@
  */
 import { useEffect, useState, type CSSProperties } from 'react'
 import type { TaskNotifyConfig } from '../task-notify-config.ts'
-import { DEFAULT_TASK_NOTIFY_CONFIG } from '../task-notify-config.ts'
+import { DEFAULT_TASK_NOTIFY_CONFIG, resolvePlainConfig } from '../task-notify-config.ts'
 
 /**
  * Minimal live-scope face the card subscribes to. Structurally compatible
@@ -44,7 +44,8 @@ export interface TaskNotifyCardInjected {
 /* ---------------------------------------------------------------------------
  * DSW standard card tokens (mirror of PluginCard.module.css + fields.module.css)
  * ------------------------------------------------------------------------- */
-const T = {
+/** 0.3.1 导出：桌面端设置卡（desktop-settings.tsx）复用同一套设计 token 与字段件。 */
+export const T = {
   borderL2: 'var(--dsw-alias-border-l2)',
   labelDimmed: 'var(--dsw-alias-label-dimmed)',
   labelPrimary: 'var(--dsw-alias-label-primary)',
@@ -57,7 +58,7 @@ const T = {
   brandPrimary: 'var(--dsw-alias-brand-primary)',
 }
 
-const s: Record<string, CSSProperties> = {
+export const s: Record<string, CSSProperties> = {
   card: { listStyle: 'none', border: `1px solid ${T.borderL2}`, borderRadius: 12, background: T.bgLayer3, transition: 'border-color .16s, background .16s' },
   cardOpen: { background: T.bgLayer2, borderColor: T.labelDimmed },
   header: { width: '100%', appearance: 'none', border: 0, background: 'none', font: 'inherit', color: 'inherit', textAlign: 'left', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', borderRadius: 12 },
@@ -96,7 +97,7 @@ function ChevronIcon({ style, open }: { style: CSSProperties; open: boolean }) {
 }
 
 /** Label + control + hint field, mirroring fields.tsx's ValueField. */
-function Field(props: {
+export function Field(props: {
   id: string
   label: string
   hint: string
@@ -140,7 +141,7 @@ function Field(props: {
 }
 
 /** DSW-style switch used for every boolean setting (not a native checkbox). */
-function Switch(props: {
+export function Switch(props: {
   label: string
   hint: string
   checked: boolean
@@ -181,13 +182,13 @@ function Switch(props: {
 }
 
 /** Numeric keys of the config: staged as raw text until Save. */
-const NUM_KEYS = ['thresholdMinutes', 'mergeMs', 'masterVolume', 'subVolume'] as const
-type NumKey = (typeof NUM_KEYS)[number]
+export const NUM_KEYS = ['thresholdMinutes', 'mergeMs', 'masterVolume', 'subVolume'] as const
+export type NumKey = (typeof NUM_KEYS)[number]
 /** Boolean keys of the config: staged directly into the draft. */
-const BOOL_KEYS = ['enabled', 'subReminderEnabled', 'ttsEnabled', 'titleFlash', 'globalSessions', 'batchSingleBeep'] as const
-type BoolKey = (typeof BOOL_KEYS)[number]
+export const BOOL_KEYS = ['enabled', 'subReminderEnabled', 'ttsEnabled', 'titleFlash', 'globalSessions', 'batchSingleBeep'] as const
+export type BoolKey = (typeof BOOL_KEYS)[number]
 
-function parseNum(text: string, fallback: number): number {
+export function parseNum(text: string, fallback: number): number {
   if (text === '') return fallback
   const n = Number(text)
   return Number.isFinite(n) ? n : fallback
@@ -198,9 +199,9 @@ export function TaskNotifyCard({ scope, set }: TaskNotifyCardInjected) {
   // Live-resolved config: re-read from the bound scope on every snapshot
   // change (i.e. after each settled write) instead of trusting a one-shot
   // registration-time value that the slot renderer caches forever.
-  const [base, setBase] = useState<TaskNotifyConfig>(() => scope.getSnapshot().value ?? DEFAULT_TASK_NOTIFY_CONFIG)
+  const [base, setBase] = useState<TaskNotifyConfig>(() => resolvePlainConfig(scope.getSnapshot().value))
   useEffect(() => scope.subscribe(() => {
-    setBase(scope.getSnapshot().value ?? DEFAULT_TASK_NOTIFY_CONFIG)
+    setBase(resolvePlainConfig(scope.getSnapshot().value))
   }), [scope])
   const [bools, setBools] = useState<TaskNotifyConfig | null>(null)
   const [numText, setNumText] = useState<Record<NumKey, string>>(() => ({

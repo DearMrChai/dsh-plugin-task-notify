@@ -16,9 +16,10 @@
 import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type { TaskNotifyConfig } from '../task-notify-config.ts'
-import { TASK_NOTIFY_NS } from '../task-notify-config.ts'
+import { TASK_NOTIFY_NS, DEFAULT_TASK_NOTIFY_CONFIG } from '../task-notify-config.ts'
 import { dbg, installNotifier } from './notifier.ts'
-import { installDesktopNotifier } from './desktop.ts'
+import { installDesktopNotifier, type DesktopConfigBus } from './desktop.ts'
+import { installDesktopSettingsPage } from './desktop-settings.tsx'
 import { TaskNotifyCard } from './TaskNotifyCard.tsx'
 import type { TaskNotifyCardInjected } from './TaskNotifyCard.tsx'
 
@@ -66,11 +67,25 @@ export function apply(ctx: ClientContext): void {
     applyWeb(ctx, settingsScope)
     return
   }
-  console.info('[task-notify] desktop runtime detected（无 settingsScope）→ 桌面通知器')
+  console.info('[task-notify] desktop runtime detected（无 settingsScope）→ 桌面通知器 + 设置页')
+  // 0.3.1 配置总线：通知器与设置页共享同一份活配置——设置页保存成功即回灌，
+  // 免重启即时生效（0.3.0 时代手编 yml 必须重启）。
+  const bus: DesktopConfigBus = {
+    cfg: { ...DEFAULT_TASK_NOTIFY_CONFIG },
+    applyConfig: (next) => {
+      bus.cfg = { ...DEFAULT_TASK_NOTIFY_CONFIG, ...next }
+    },
+    refreshConfig: async () => {},
+  }
   try {
-    installDesktopNotifier(ctx as unknown as Record<string, any>)
+    installDesktopNotifier(ctx as unknown as Record<string, any>, bus)
   } catch (err) {
     console.info('[task-notify] desktop notifier install failed:', err)
+  }
+  try {
+    installDesktopSettingsPage(ctx as unknown as Record<string, any>, (cfg) => { bus.applyConfig(cfg) })
+  } catch (err) {
+    console.info('[task-notify] desktop settings page install failed（提醒不受影响）:', err)
   }
 }
 

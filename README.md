@@ -77,12 +77,21 @@ Restart `dsh web` and the settings card appears under **Settings → Plugins**.
 
 ## Desktop (DSH 0.2.x) / 桌面端
 
-0.3.0 起同一份产物同时兼容 DSH 桌面端（`0.2.0-rc.2` 实证）。桌面端与 web 的差异：
+0.3.0 起同一份产物同时兼容 DSH 桌面端（`0.2.0-rc.2` 实证）；0.3.1 起桌面端
+**设置界面恢复**：设置页 → 内置插件 → "任务提醒" 标签页（`settings.plugins.tab`
+槽位，与官方插件设置页同一代机制），11 项配置在线读写，保存即落
+`profiles/desktop/cordis.patch.yml` 并热重载，提醒器**免重启即时生效**。桌面端与
+web 的差异：
 
-- **配置来源**：桌面端客户端运行时没有 `settingsScope` 服务、设置页也不再渲染
-  `settings.plugin.item` 槽位，因此**没有设置卡**。配置走宿主半新增的
-  `GET /task-notify/api/config` 路由，值来自 profile 的 patch 层 ——
-  改配置 = 手编 `profiles/desktop/cordis.patch.yml`：
+- **设置页（0.3.1）**：桌面端客户端运行时没有 `settingsScope` 服务、设置页也不再
+  渲染 `settings.plugin.item` 槽位，所以卡片注册到 0.2.0 的 `settings.plugins.tab`
+  槽（设置页"内置插件"分区；官方 shell / agent-loop / web-search 等插件设置页
+  同为这一代机制）。读取走宿主半 `GET /task-notify/api/config`（value/base/
+  revision）；保存走 `POST /task-notify/api/config` —— 宿主半以 `settings.update`
+  写入 profile 的 patch 层（configEditor 原子写 + 配置层热重载 + entry 重挂载），
+  与官方设置页**同一条持久化路径**；落盘后响应回读新值，设置卡与桌面通知器
+  同时刷新。手编 `profiles/desktop/cordis.patch.yml` 仍然有效（形状相同），作为
+  脚本化/无人值守的配置入口保留：
 
   ```yaml
   - id: task-notify
@@ -92,7 +101,13 @@ Restart `dsh web` and the settings card appears under **Settings → Plugins**.
       masterVolume: 0.6
   ```
 
-  （patch 对 config 是整体替换语义，要改的字段写全；改完重启桌面端。）
+  （patch 对 config 是整体替换语义，要改的字段写全；0.3.1 后保存走设置页即自动
+  生成/更新这一段，无需手编。）
+- **volatile 标记（0.3.1）**：宿主半 `Config` schema 的 11 个字段全标
+  `.volatile()` —— 0.2.0 的 `SettingsForms` 只为 volatile 字段生成可编辑表单，
+  这也是设置页能出现/写到本插件的前提。volatile 字段在 0.2.0 运行时解析为
+  引用对象（`{ get() }`），宿主半与 web 路径消费前统一 `resolvePlainConfig`
+  解包（两代运行时行为一致）。
 - **轮次边界**：不再读 `getSnapshot().running`（0.2.0 会话快照无此字段），改订阅
   每个会话的 `eventSource` 事件流（`turn/start` / `turn/end`），与
   `dsh-plugin-whale-pet` 同款客户端契约。声音触发规则与 web 一致。

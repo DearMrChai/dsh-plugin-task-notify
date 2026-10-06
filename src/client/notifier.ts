@@ -11,7 +11,11 @@ import type {
   ConversationSnapshot, ISessions, SessionFace, SettingsScope,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import type { TaskNotifyConfig } from '../task-notify-config.ts'
-import { DEFAULT_TASK_NOTIFY_CONFIG, SUBAGENT_TOOL_NAMES } from '../task-notify-config.ts'
+import {
+  DEFAULT_TASK_NOTIFY_CONFIG,
+  SUBAGENT_TOOL_NAMES,
+  resolvePlainConfig,
+} from '../task-notify-config.ts'
 
 /* ------------------------------------------------------------------ */
 /* Frontend-style tracing: F12 → Console                                */
@@ -267,10 +271,11 @@ export function installNotifier(
   const engine = new SoundEngine()
   engine.prime()
 
-  let cfg: TaskNotifyConfig = scope.getSnapshot().value ?? DEFAULT_TASK_NOTIFY_CONFIG
+  // 0.3.1 起 schema 标了 volatile：部分运行时把字段解析成引用对象，消费前统一解包
+  let cfg: TaskNotifyConfig = resolvePlainConfig(scope.getSnapshot().value)
   console.info('[task-notify] installNotifier:', 'global=', cfg.globalSessions, 'sessions=', sessions.list.getSnapshot().ids.length, 'current=', sessions.list.getSnapshot().current, 'cfg=', cfg)
   cleanup(() => scope.subscribe(() => {
-    cfg = scope.getSnapshot().value ?? cfg
+    cfg = resolvePlainConfig(scope.getSnapshot().value)
     dbg('cfg updated', cfg)
   }))
 

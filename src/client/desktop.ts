@@ -157,10 +157,22 @@ class DesktopTurnTracker {
 }
 
 /**
+ * 0.3.1 桌面端配置总线：通知器与设置卡共享同一份活配置。
+ *  设置卡保存成功 → applyConfig(新值)（免重启即时生效）；
+ *  connection 重连 → refreshConfig() 走宿主半路由回读。
+ */
+export interface DesktopConfigBus {
+  cfg: TaskNotifyConfig
+  /** 设置卡保存成功后回灌（值必须已解包为纯数据）。 */
+  applyConfig: (next: TaskNotifyConfig) => void
+  refreshConfig: () => Promise<void>
+}
+
+/**
  * 桌面端通知器装配：配置拉取 + sessions.list 跟随 + 逐会话 retain 事件流。
  * 任何一步失败都只降级（少响或不响），绝不抛出到 apply 之外。
  */
-export function installDesktopNotifier(ctx: Loose): void {
+export function installDesktopNotifier(ctx: Loose, bus: DesktopConfigBus): void {
   const sessions = ctx?.sessions
   const list = sessions?.list
   if (!list || typeof list.getSnapshot !== 'function' || typeof list.subscribe !== 'function') {
@@ -175,28 +187,28 @@ export function installDesktopNotifier(ctx: Loose): void {
   const engine = new SoundEngine()
   engine.prime()
 
-  const state = { cfg: { ...DEFAULT_TASK_NOTIFY_CONFIG } }
   let sync: () => void = () => {}
 
-  // 配置：宿主半路由（0.2.0 无 settingsScope；桌面端改配置 = 手编 patch yml + 重启）
+  // 配置：宿主半路由（0.2.0 无 settingsScope；0.3.1 起设置卡保存经 bus.applyConfig 即时回灌）
   const refreshConfig = async (): Promise<void> => {
     try {
       const res = await fetch('/task-notify/api/config', { cache: 'no-store' })
       const body = (await res.json()) as Loose
       if (body?.ok === true && body.config && typeof body.config === 'object') {
-        state.cfg = { ...DEFAULT_TASK_NOTIFY_CONFIG, ...(body.config as Partial<TaskNotifyConfig>) }
+        bus.applyConfig({ ...DEFAULT_TASK_NOTIFY_CONFIG, ...(body.config as Partial<TaskNotifyConfig>) })
         console.info(
           '[task-notify] desktop config loaded: threshold=',
-          state.cfg.thresholdMinutes,
+          bus.cfg.thresholdMinutes,
           'global=',
-          state.cfg.globalSessions,
+          bus.cfg.globalSessions,
         )
         sync()
       }
     } catch (err) {
-      console.info('[task-notify] desktop config fetch failed（沿用默认值）:', err)
+      console.info('[task-notify] desktop config fetch failed（沿用当前值）:', err)
     }
   }
+  bus.refreshConfig = () => refreshConfig()
   try {
     const connState = ctx?.connection?.state
     if (connState && typeof connState.subscribe === 'function') {
@@ -255,7 +267,7 @@ export function installDesktopNotifier(ctx: Loose): void {
       dbg('desktop eventSource unavailable', id)
       return
     }
-    const tracker = new DesktopTurnTracker(id, () => state.cfg, engine, () => isSubagentRow(id))
+    const tracker = new DesktopTurnTracker(id, () => bus.cfg, engine, () => isSubagentRow(id))
     try {
       tracker.adopt(source.getSnapshot()?.entries)
     } catch (err) {
@@ -328,9 +340,9 @@ export function installDesktopNotifier(ctx: Loose): void {
       dbg('desktop list snapshot failed', err)
       return
     }
-    const activeIds = state.cfg.globalSessions ? ids : current !== undefined ? [current] : []
+    const activeIds = bus.cfg.globalSessions ? ids : current !== undefined ? [current] : []
     const wanted = new Set<string>(activeIds)
-    dbg('desktop sync sessions', 'global=', state.cfg.globalSessions, 'wanted=', [...wanted], 'trackers=', trackers.size)
+    dbg('desktop sync sessions', 'global=', bus.cfg.globalSessions, 'wanted=', [...wanted], 'trackers=', trackers.size)
     for (const id of activeIds) attach(id)
     for (const [id, entry] of trackers) {
       if (!wanted.has(id)) {
